@@ -192,8 +192,8 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
 }
 
 @Composable
-private fun PagedTitleGrid(items: androidx.paging.compose.LazyPagingItems<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
-    if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
+private fun PagedTitleGrid(pagedItems: androidx.paging.compose.LazyPagingItems<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
+    if (pagedItems.loadState.refresh is LoadState.Loading && pagedItems.itemCount == 0) {
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
         return
     }
@@ -213,7 +213,7 @@ private fun PagedTitleGrid(items: androidx.paging.compose.LazyPagingItems<AnimeT
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
         items(items.itemCount) { index ->
-            val title = items[index]
+            val title = pagedItems[index]
             if (title != null) TitleCard(title, title.id in favoriteIds, onOpen, onFavorite)
         }
         if (items.loadState.append is LoadState.Loading) item { CircularProgressIndicator(color = Violet) }
@@ -221,7 +221,7 @@ private fun PagedTitleGrid(items: androidx.paging.compose.LazyPagingItems<AnimeT
 }
 
 @Composable
-private fun TitleGrid(items: List<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
+private fun TitleGrid(titles: List<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 145.dp),
         modifier = Modifier.fillMaxSize(),
@@ -229,7 +229,7 @@ private fun TitleGrid(items: List<AnimeTitle>, favoriteIds: Set<String>, onOpen:
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(items, key = { it.id }) { title -> TitleCard(title, title.id in favoriteIds, onOpen, onFavorite) }
+        items(titles, key = { it.id }) { title -> TitleCard(title, title.id in favoriteIds, onOpen, onFavorite) }
     }
 }
 
