@@ -20,6 +20,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.History
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
@@ -38,6 +39,7 @@ import androidx.paging.compose.collectAsLazyPagingItems
 import coil.compose.AsyncImage
 import com.liaquatali.animex.data.AnimeTitle
 import com.liaquatali.animex.data.FavoriteEntity
+import com.liaquatali.animex.data.WatchHistoryEntity
 import com.liaquatali.animex.ui.AnimeViewModel
 
 private val Background = Color(0xFF080A10)
@@ -61,6 +63,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
     var streamUrl by remember { mutableStateOf("") }
     var streamUrlError by remember { mutableStateOf(false) }
     val favorites by vm.favorites.collectAsState()
+    val history by vm.history.collectAsState()
     val catalogItems = vm.catalog.collectAsLazyPagingItems()
     val searchItems = vm.searchResults.collectAsLazyPagingItems()
     val context = androidx.compose.ui.platform.LocalContext.current
@@ -80,6 +83,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                     NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
                     NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 }, icon = { Icon(Icons.Default.Search, null) }, label = { Text("Search") })
                     NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 }, icon = { Icon(Icons.Default.FavoriteBorder, null) }, label = { Text("My List") })
+                    NavigationBarItem(selected = selectedTab == 3, onClick = { selectedTab = 3 }, icon = { Icon(Icons.Default.History, null) }, label = { Text("History") })
                 }
             }
         ) { padding ->
@@ -87,7 +91,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Column(Modifier.weight(1f)) {
                         Text("ANIMEX", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
-                        Text(when (selectedTab) { 1 -> "Find your next anime"; 2 -> "Your collection"; else -> "Anime, your way." }, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
+                        Text(when (selectedTab) { 1 -> "Find your next anime"; 2 -> "Your collection"; 3 -> "Continue watching"; else -> "Anime, your way." }, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
                     IconButton(onClick = { showMediaDialog = true }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Play local video", tint = Violet)
@@ -123,12 +127,14 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                     }
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
-                    Text(if (selectedTab == 2) "Saved titles" else if (selectedTab == 1) "Search results" else "Popular titles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    Text(if (selectedTab == 2) "Saved titles" else if (selectedTab == 1) "Search results" else if (selectedTab == 3) "Recently played" else "Popular titles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
                     if (selectedTab == 0) TextButton(onClick = { catalogItems.refresh() }) { Text("Refresh", color = Violet) }
                 }
                 when (selectedTab) {
                     2 -> if (favorites.isEmpty()) EmptyState("Nothing saved yet", "Tap the heart on any title to keep it here.")
                          else TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
+                    3 -> if (history.isEmpty()) EmptyState("No watch history", "Videos you play will appear here with their saved position.")
+                         else HistoryList(history) { entry -> context.startActivity(Intent(context, LocalPlayerActivity::class.java).setData(Uri.parse(entry.mediaUri))) }
                     1 -> if (query.isBlank()) EmptyState("Search anime", "Enter a title above and tap the search icon.")
                          else PagedTitleGrid(searchItems, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
                     else -> PagedTitleGrid(catalogItems, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
@@ -187,6 +193,27 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                 confirmButton = { TextButton(onClick = { vm.toggleFavorite(title) }) { Text("Save / remove", color = Violet) } },
                 dismissButton = { TextButton(onClick = { selectedTitle = null }) { Text("Close", color = Muted) } }
             )
+        }
+    }
+}
+
+
+@Composable
+private fun HistoryList(entries: List<WatchHistoryEntity>, onResume: (WatchHistoryEntity) -> Unit) {
+    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        entries.forEach { entry ->
+            val progress = if (entry.durationMs > 0) ((entry.positionMs * 100) / entry.durationMs).coerceIn(0, 100) else 0
+            Surface(
+                modifier = Modifier.fillMaxWidth().clickable { onResume(entry) },
+                shape = RoundedCornerShape(16.dp),
+                color = SurfaceDark
+            ) {
+                Column(Modifier.padding(16.dp)) {
+                    Text(entry.displayName, color = Color.White, fontWeight = FontWeight.SemiBold)
+                    Spacer(Modifier.height(5.dp))
+                    Text("$progress% watched · Tap to resume", color = Muted, fontSize = 12.sp)
+                }
+            }
         }
     }
 }
