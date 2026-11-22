@@ -35,7 +35,6 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.paging.LoadState
 import androidx.paging.compose.collectAsLazyPagingItems
-import androidx.compose.foundation.lazy.grid.items
 import coil.compose.AsyncImage
 import com.liaquatali.animex.data.AnimeTitle
 import com.liaquatali.animex.data.FavoriteEntity
