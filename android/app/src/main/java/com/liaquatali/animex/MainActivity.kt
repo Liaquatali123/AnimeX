@@ -227,11 +227,11 @@ private fun PagedTitleGrid(pagedItems: androidx.paging.compose.LazyPagingItems<A
         Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
         return
     }
-    if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
+    if (pagedItems.loadState.refresh is LoadState.Error && pagedItems.itemCount == 0) {
         EmptyState("Catalog unavailable", "Check the backend URL, internet connection and provider configuration.")
         return
     }
-    if (items.itemCount == 0) {
+    if (pagedItems.itemCount == 0) {
         EmptyState("No titles found", "The provider returned no matching titles.")
         return
     }
@@ -242,11 +242,11 @@ private fun PagedTitleGrid(pagedItems: androidx.paging.compose.LazyPagingItems<A
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(items.itemCount) { index ->
+        items(pagedItems.itemCount) { index ->
             val title = pagedItems[index]
             if (title != null) TitleCard(title, title.id in favoriteIds, onOpen, onFavorite)
         }
-        if (items.loadState.append is LoadState.Loading) item { CircularProgressIndicator(color = Violet) }
+        if (pagedItems.loadState.append is LoadState.Loading) item { CircularProgressIndicator(color = Violet) }
     }
 }
 
