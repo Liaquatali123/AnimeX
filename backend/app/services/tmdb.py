@@ -49,8 +49,8 @@ class TmdbProvider:
         return {"items": items, "page": raw.get("page", page), "limit": limit, "total": raw.get("total_results", 0), "has_next": raw.get("page", page) < raw.get("total_pages", 0), "source": "tmdb"}
 
     async def search(self, query: str, page: int = 1):
-        raw = await self.request("/search/multi", {"query": query, "page": page, "include_adult": "false"})
-        items = [self.normalize(x) for x in raw.get("results", []) if x.get("media_type") in ("movie", "tv")]
+        raw = await self.request("/search/movie", {"query": query, "page": page, "include_adult": "false"})
+        items = [self.normalize(x) for x in raw.get("results", []) if 16 in x.get("genre_ids", [])]
         return {"items": items, "page": raw.get("page", page), "total": raw.get("total_results", 0), "has_next": raw.get("page", page) < raw.get("total_pages", 0), "source": "tmdb"}
 
     async def genres(self):
