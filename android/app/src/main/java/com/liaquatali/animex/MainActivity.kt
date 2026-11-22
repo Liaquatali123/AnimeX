@@ -32,6 +32,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import androidx.paging.LoadState
+import androidx.paging.compose.collectAsLazyPagingItems
+import androidx.compose.foundation.lazy.grid.items
 import coil.compose.AsyncImage
 import com.liaquatali.animex.data.AnimeTitle
 import com.liaquatali.animex.data.FavoriteEntity
@@ -54,15 +57,14 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
     var selectedTitle by remember { mutableStateOf<AnimeTitle?>(null) }
-    val titles by vm.titles.collectAsState()
     val favorites by vm.favorites.collectAsState()
-    val loading by vm.loading.collectAsState()
-    val error by vm.error.collectAsState()
-
+    val catalogItems = vm.catalog.collectAsLazyPagingItems()
+    val searchItems = vm.searchResults.collectAsLazyPagingItems()
     val context = androidx.compose.ui.platform.LocalContext.current
+
     val localVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            try { context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION) } catch (_: SecurityException) { }
             context.startActivity(Intent(context, LocalPlayerActivity::class.java).setData(uri))
         }
     }
@@ -103,11 +105,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                     Spacer(Modifier.height(12.dp))
                 }
                 if (selectedTab == 0) {
-                    Surface(
-                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
-                        shape = RoundedCornerShape(26.dp),
-                        color = SurfaceDark
-                    ) {
+                    Surface(modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp), shape = RoundedCornerShape(26.dp), color = SurfaceDark) {
                         Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF30265B), SurfaceDark))).padding(22.dp)) {
                             Column {
                                 Text("DISCOVER SOMETHING NEW", color = Violet, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
@@ -123,15 +121,14 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(if (selectedTab == 2) "Saved titles" else if (selectedTab == 1) "Search results" else "Popular titles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
-                    if (selectedTab == 0) TextButton(onClick = { vm.loadCatalog() }) { Text("Refresh", color = Violet) }
+                    if (selectedTab == 0) TextButton(onClick = { catalogItems.refresh() }) { Text("Refresh", color = Violet) }
                 }
-                when {
-                    selectedTab == 2 && favorites.isEmpty() -> EmptyState("Nothing saved yet", "Tap the heart on any title to keep it here.")
-                    loading -> Box(Modifier.fillMaxWidth().heightIn(min = 220.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
-                    error != null -> EmptyState("Catalog unavailable", error ?: "Try again.")
-                    selectedTab == 2 -> TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
-                    titles.isEmpty() -> EmptyState("No titles to show", "Connect the backend and configure its TMDB metadata token. AnimeX never inserts fake posters or placeholder titles.")
-                    else -> TitleGrid(titles, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = vm::toggleFavorite)
+                when (selectedTab) {
+                    2 -> if (favorites.isEmpty()) EmptyState("Nothing saved yet", "Tap the heart on any title to keep it here.")
+                         else TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
+                    1 -> if (query.isBlank()) EmptyState("Search anime", "Enter a title above and tap the search icon.")
+                         else PagedTitleGrid(searchItems, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
+                    else -> PagedTitleGrid(catalogItems, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
                 }
             }
         }
@@ -154,6 +151,35 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
 }
 
 @Composable
+private fun PagedTitleGrid(items: androidx.paging.compose.LazyPagingItems<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
+    if (items.loadState.refresh is LoadState.Loading && items.itemCount == 0) {
+        Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
+        return
+    }
+    if (items.loadState.refresh is LoadState.Error && items.itemCount == 0) {
+        EmptyState("Catalog unavailable", "Check the backend URL, internet connection and provider configuration.")
+        return
+    }
+    if (items.itemCount == 0) {
+        EmptyState("No titles found", "The provider returned no matching titles.")
+        return
+    }
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 145.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        items(items.itemCount) { index ->
+            val title = items[index]
+            if (title != null) TitleCard(title, title.id in favoriteIds, onOpen, onFavorite)
+        }
+        if (items.loadState.append is LoadState.Loading) item { CircularProgressIndicator(color = Violet) }
+    }
+}
+
+@Composable
 private fun TitleGrid(items: List<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
     LazyVerticalGrid(
         columns = GridCells.Adaptive(minSize = 145.dp),
@@ -162,29 +188,31 @@ private fun TitleGrid(items: List<AnimeTitle>, favoriteIds: Set<String>, onOpen:
         horizontalArrangement = Arrangement.spacedBy(12.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp)
     ) {
-        items(items, key = { it.id }) { title ->
-            Column {
-                Box {
-                    Surface(shape = RoundedCornerShape(18.dp), color = SurfaceDark, modifier = Modifier.fillMaxWidth().height(205.dp).clickable { onOpen(title) }) {
-                        if (title.poster_url != null) AsyncImage(model = title.poster_url, contentDescription = title.title, modifier = Modifier.fillMaxSize())
-                        else Box(contentAlignment = Alignment.Center) { Text("POSTER
-UNAVAILABLE", color = Muted, fontSize = 11.sp) }
-                    }
-                    IconButton(onClick = { onFavorite(title) }, modifier = Modifier.align(Alignment.TopEnd)) {
-                        Icon(if (title.id in favoriteIds) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = if (title.id in favoriteIds) Color(0xFFFF6B91) else Color.White)
-                    }
-                }
-                Spacer(Modifier.height(7.dp))
-                Text(title.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 2)
-                Text(title.release_date?.take(4) ?: "Anime", color = Muted, fontSize = 11.sp)
+        items(items, key = { it.id }) { title -> TitleCard(title, title.id in favoriteIds, onOpen, onFavorite) }
+    }
+}
+
+@Composable
+private fun TitleCard(title: AnimeTitle, isFavorite: Boolean, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
+    Column {
+        Box {
+            Surface(shape = RoundedCornerShape(18.dp), color = SurfaceDark, modifier = Modifier.fillMaxWidth().height(205.dp).clickable { onOpen(title) }) {
+                if (title.poster_url != null) AsyncImage(model = title.poster_url, contentDescription = title.title, modifier = Modifier.fillMaxSize())
+                else Box(contentAlignment = Alignment.Center) { Text("POSTER UNAVAILABLE", color = Muted, fontSize = 11.sp) }
+            }
+            IconButton(onClick = { onFavorite(title) }, modifier = Modifier.align(Alignment.TopEnd)) {
+                Icon(if (isFavorite) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = if (isFavorite) Color(0xFFFF6B91) else Color.White)
             }
         }
+        Spacer(Modifier.height(7.dp))
+        Text(title.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 2)
+        Text(title.release_date?.take(4) ?: "Anime", color = Muted, fontSize = 11.sp)
     }
 }
 
 @Composable
 private fun EmptyState(title: String, message: String) {
-    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+    Box(Modifier.fillMaxWidth().heightIn(min = 220.dp), contentAlignment = Alignment.Center) {
         Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(28.dp)) {
             Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
             Spacer(Modifier.height(8.dp))
