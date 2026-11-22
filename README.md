@@ -1,33 +1,61 @@
 # AnimeX
 
-A native Android anime discovery and personal media app built with Kotlin, Jetpack Compose, Paging 3, Room and Media3. The companion backend is FastAPI and exposes normalized catalog metadata from sources that permit API access.
+AnimeX is a native Android anime discovery app and personal media player.
 
-## Project status
+## Current implementation
 
-This repository is being initialized. The first milestone is catalog discovery and metadata only. Playback is designed for user-owned files and explicitly authorized streams; the app does not bypass DRM, paywalls, access controls, or scrape protected player links.
+- Kotlin + Jetpack Compose dark OTT-style interface.
+- FastAPI metadata backend with TMDB API adapter, search, genres, details and in-process TTL caching.
+- Paging 3 catalog and search loading.
+- Room favorites and local watch-progress history.
+- Coil poster loading.
+- Media3 ExoPlayer for user-selected local videos and explicitly authorized HTTPS MP4/HLS URLs.
+- Audio-track and subtitle-track selection when those tracks are present in the media.
+- GitHub Actions CI for backend tests and Android debug compilation.
 
-## Repository layout
+## Backend setup
 
-- `backend/` — FastAPI catalog API, provider abstraction, cache and tests.
-- `android/` — Android Studio project using Kotlin, Compose, Room, Paging and Media3.
-- `docs/` — architecture and development notes.
-
-## Backend quick start
+1. Get a TMDB API Read Access Token from your TMDB account.
+2. Copy `backend/.env.example` to `backend/.env` and set `TMDB_API_KEY`.
+3. Run:
 
 ```bash
 cd backend
 python -m venv .venv
 source .venv/bin/activate
 pip install -r requirements.txt
-uvicorn app.main:app --reload
+uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
 
-Open `http://127.0.0.1:8000/docs` for the API docs.
+API routes:
+- `GET /health`
+- `GET /v1/catalog?page=1&limit=20`
+- `GET /v1/search?q=naruto&page=1`
+- `GET /v1/genres`
+- `GET /v1/titles/{id}`
 
-## Android
+Keep the TMDB token on the backend. Never embed it in the Android APK.
 
-Open the `android/` directory in Android Studio. Set `API_BASE_URL` in `android/gradle.properties` for your backend. The Android app can also browse locally cached catalog metadata when offline.
+## Android setup
 
-## Data and playback
+Open `android/` in Android Studio with JDK 17 and Android SDK 35. Set the backend's HTTPS base URL in `android/gradle.properties`:
 
-Metadata providers must be used according to their terms and rate limits. Only public metadata and authorized playback sources are supported. Local video playback does not require an account or backend.
+```properties
+API_BASE_URL=https://your-api-host.example/
+```
+
+The URL must end with a slash. For a physical Android phone, use a reachable HTTPS deployment or a properly configured local development network. The manifest intentionally disallows cleartext HTTP.
+
+Build from the repository root:
+
+```bash
+gradle -p android :app:assembleDebug
+```
+
+## Playback and rights
+
+The player opens local videos through Android's document picker and accepts direct HTTPS media URLs supplied by the user. Use only streams you own or are authorized to access. AnimeX does not scrape protected players, bypass DRM, defeat authentication, or grant rights to third-party video content. Audio and subtitle menus show only tracks actually present in the selected media.
+
+## Data and attribution
+
+TMDB metadata and images are provided under TMDB's terms. Configure required TMDB attribution in the published app before release. Catalog data remains empty until the backend has a valid provider token; the app does not fabricate titles, posters, audio tracks or streams.
