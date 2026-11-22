@@ -59,9 +59,9 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
     val loading by vm.loading.collectAsState()
     val error by vm.error.collectAsState()
 
+    val context = androidx.compose.ui.platform.LocalContext.current
     val localVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
         if (uri != null) {
-            val context = androidx.compose.ui.platform.LocalContext.current
             context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
             context.startActivity(Intent(context, LocalPlayerActivity::class.java).setData(uri))
         }
@@ -127,9 +127,9 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                 }
                 when {
                     selectedTab == 2 && favorites.isEmpty() -> EmptyState("Nothing saved yet", "Tap the heart on any title to keep it here.")
-                    loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
+                    loading -> Box(Modifier.fillMaxWidth().heightIn(min = 220.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
                     error != null -> EmptyState("Catalog unavailable", error ?: "Try again.")
-                    selectedTab == 2 -> TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = vm::toggleFavorite)
+                    selectedTab == 2 -> TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = { vm.toggleFavorite(it) })
                     titles.isEmpty() -> EmptyState("No titles to show", "Connect the backend and configure its TMDB metadata token. AnimeX never inserts fake posters or placeholder titles.")
                     else -> TitleGrid(titles, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = vm::toggleFavorite)
                 }
