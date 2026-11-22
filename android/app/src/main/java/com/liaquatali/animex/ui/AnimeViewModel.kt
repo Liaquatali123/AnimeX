@@ -24,6 +24,7 @@ import kotlinx.coroutines.launch
 class AnimeViewModel(application: Application) : AndroidViewModel(application) {
     private val favoritesDao = AnimeDatabase.get(application).favoriteDao()
     private val api = NetworkModule.api
+    private val historyDao = AnimeDatabase.get(application).watchHistoryDao()
     val catalog = Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) {
         AnimePagingSource(api)
     }.flow.cachedIn(viewModelScope)
@@ -32,6 +33,7 @@ class AnimeViewModel(application: Application) : AndroidViewModel(application) {
     val searchResults: StateFlow<PagingData<AnimeTitle>> = _searchResults.asStateFlow()
     private var searchJob: Job? = null
     val favorites = favoritesDao.observeAll().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
+    val history = historyDao.observeRecent().stateIn(viewModelScope, SharingStarted.WhileSubscribed(5_000), emptyList())
 
     fun search(query: String) {
         searchJob?.cancel()
