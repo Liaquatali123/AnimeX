@@ -16,7 +16,9 @@ jobs:
         with:
           python-version: '3.12'
       - run: pip install -r requirements.txt
-      - run: pytest -q
+      - run: python -m pytest -q
+        env:
+          PYTHONPATH: ${{ github.workspace }}/backend
   android-build:
     runs-on: ubuntu-latest
     steps:
@@ -25,8 +27,10 @@ jobs:
         with:
           distribution: temurin
           java-version: '17'
-      - uses: android-actions/setup-android@v3
-      - run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
+      - name: Accept Android SDK licenses
+        run: yes | sdkmanager --licenses
+      - name: Install Android SDK packages
+        run: sdkmanager "platforms;android-35" "build-tools;35.0.0"
       - uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
