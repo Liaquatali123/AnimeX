@@ -1,6 +1,7 @@
 package com.liaquatali.animex
 
 import android.content.Intent
+import android.net.Uri
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -57,6 +58,9 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
     var selectedTitle by remember { mutableStateOf<AnimeTitle?>(null) }
+    var showMediaDialog by remember { mutableStateOf(false) }
+    var streamUrl by remember { mutableStateOf("") }
+    var streamUrlError by remember { mutableStateOf(false) }
     val favorites by vm.favorites.collectAsState()
     val catalogItems = vm.catalog.collectAsLazyPagingItems()
     val searchItems = vm.searchResults.collectAsLazyPagingItems()
@@ -86,7 +90,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                         Text("ANIMEX", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
                         Text(when (selectedTab) { 1 -> "Find your next anime"; 2 -> "Your collection"; else -> "Anime, your way." }, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
-                    IconButton(onClick = { localVideoPicker.launch(arrayOf("video/*")) }) {
+                    IconButton(onClick = { showMediaDialog = true }) {
                         Icon(Icons.Default.PlayArrow, contentDescription = "Play local video", tint = Violet)
                     }
                 }
@@ -132,6 +136,44 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                 }
             }
         }
+
+        if (showMediaDialog) {
+            AlertDialog(
+                onDismissRequest = { showMediaDialog = false },
+                containerColor = SurfaceDark,
+                title = { Text("Open media", color = Color.White) },
+                text = {
+                    Column {
+                        Button(onClick = { showMediaDialog = false; localVideoPicker.launch(arrayOf("video/*")) }, modifier = Modifier.fillMaxWidth()) {
+                            Text("Choose a video on this device")
+                        }
+                        Spacer(Modifier.height(12.dp))
+                        OutlinedTextField(
+                            value = streamUrl,
+                            onValueChange = { streamUrl = it; streamUrlError = false },
+                            modifier = Modifier.fillMaxWidth(),
+                            label = { Text("Authorized HTTPS MP4 / HLS URL") },
+                            singleLine = true,
+                            isError = streamUrlError
+                        )
+                        if (streamUrlError) Text("Enter a valid HTTPS media URL.", color = MaterialTheme.colorScheme.error)
+                        Text("Only play media you own or are authorized to access.", color = Muted, fontSize = 11.sp)
+                    }
+                },
+                confirmButton = {
+                    TextButton(onClick = {
+                        val uri = runCatching { Uri.parse(streamUrl.trim()) }.getOrNull()
+                        if (uri?.scheme == "https" && !uri.host.isNullOrBlank()) {
+                            context.startActivity(Intent(context, LocalPlayerActivity::class.java).setData(uri))
+                            showMediaDialog = false
+                            streamUrlError = false
+                        } else streamUrlError = true
+                    }) { Text("Play stream", color = Violet) }
+                },
+                dismissButton = { TextButton(onClick = { showMediaDialog = false }) { Text("Cancel", color = Muted) } }
+            )
+        }
+
         selectedTitle?.let { title ->
             AlertDialog(
                 onDismissRequest = { selectedTitle = null },
