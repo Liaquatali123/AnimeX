@@ -127,6 +127,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
                             }
                         }
                     }
+                    Text("Anime metadata powered by TMDB. Not endorsed or certified by TMDB.", color = Muted, fontSize = 10.sp, modifier = Modifier.padding(horizontal = 22.dp, vertical = 8.dp))
                 }
                 Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
                     Text(if (selectedTab == 2) "Saved titles" else if (selectedTab == 1) "Search results" else if (selectedTab == 3) "Recently played" else "Popular titles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
