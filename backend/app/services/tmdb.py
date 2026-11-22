@@ -41,9 +41,9 @@ class TmdbProvider:
         }
 
     async def discover(self, page: int, limit: int, genre: int | None = None):
-        params = {"page": page, "include_adult": "false", "sort_by": "popularity.desc"}
+        params = {"page": page, "include_adult": "false", "sort_by": "popularity.desc", "with_genres": "16", "with_original_language": "ja"}
         if genre is not None:
-            params["with_genres"] = genre
+            params["with_genres"] = f"16,{genre}"
         raw = await self.request("/discover/movie", params)
         items = [self.normalize(x) for x in raw.get("results", [])]
         return {"items": items, "page": raw.get("page", page), "limit": limit, "total": raw.get("total_results", 0), "has_next": raw.get("page", page) < raw.get("total_pages", 0), "source": "tmdb"}
