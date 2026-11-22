@@ -1,29 +1,46 @@
 package com.liaquatali.animex
 
+import android.content.Intent
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardActions
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Favorite
 import androidx.compose.material.icons.filled.FavoriteBorder
 import androidx.compose.material.icons.filled.Home
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import coil.compose.AsyncImage
+import com.liaquatali.animex.data.AnimeTitle
+import com.liaquatali.animex.data.FavoriteEntity
+import com.liaquatali.animex.ui.AnimeViewModel
 
-private val Ink = Color(0xFF0B0D12)
-private val Panel = Color(0xFF171B25)
-private val Accent = Color(0xFF8B7CFF)
+private val Background = Color(0xFF080A10)
+private val SurfaceDark = Color(0xFF141824)
+private val Violet = Color(0xFF9B8CFF)
+private val Muted = Color(0xFF9AA3B5)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -33,53 +50,133 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun AnimeXApp() {
+private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
     var selectedTab by remember { mutableIntStateOf(0) }
     var query by remember { mutableStateOf("") }
-    MaterialTheme(colorScheme = darkColorScheme(primary = Accent, background = Ink, surface = Panel)) {
+    var selectedTitle by remember { mutableStateOf<AnimeTitle?>(null) }
+    val titles by vm.titles.collectAsState()
+    val favorites by vm.favorites.collectAsState()
+    val loading by vm.loading.collectAsState()
+    val error by vm.error.collectAsState()
+
+    val localVideoPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
+        if (uri != null) {
+            val context = androidx.compose.ui.platform.LocalContext.current
+            context.contentResolver.takePersistableUriPermission(uri, Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            context.startActivity(Intent(context, LocalPlayerActivity::class.java).setData(uri))
+        }
+    }
+
+    MaterialTheme(colorScheme = darkColorScheme(primary = Violet, background = Background, surface = SurfaceDark)) {
         Scaffold(
-            containerColor = Ink,
+            containerColor = Background,
             bottomBar = {
-                NavigationBar(containerColor = Panel) {
+                NavigationBar(containerColor = SurfaceDark, contentColor = Color.White) {
                     NavigationBarItem(selected = selectedTab == 0, onClick = { selectedTab = 0 }, icon = { Icon(Icons.Default.Home, null) }, label = { Text("Home") })
                     NavigationBarItem(selected = selectedTab == 1, onClick = { selectedTab = 1 }, icon = { Icon(Icons.Default.Search, null) }, label = { Text("Search") })
                     NavigationBarItem(selected = selectedTab == 2, onClick = { selectedTab = 2 }, icon = { Icon(Icons.Default.FavoriteBorder, null) }, label = { Text("My List") })
                 }
             }
         ) { padding ->
-            Column(Modifier.fillMaxSize().padding(padding).padding(horizontal = 18.dp)) {
-                Spacer(Modifier.height(18.dp))
-                Text("ANIMEX", color = Accent, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, letterSpacing = 4.sp)
-                Spacer(Modifier.height(8.dp))
-                Text(when (selectedTab) { 1 -> "Discover anime"; 2 -> "Your collection"; else -> "Anime, your way." }, color = Color.White, fontSize = 29.sp, fontWeight = FontWeight.Bold)
-                Spacer(Modifier.height(14.dp))
-                if (selectedTab == 1) {
-                    OutlinedTextField(value = query, onValueChange = { query = it }, modifier = Modifier.fillMaxWidth(), placeholder = { Text("Search titles") }, singleLine = true)
-                    Spacer(Modifier.height(16.dp))
-                }
-                if (selectedTab == 2) EmptyState("Your list is empty", "Save titles to find them here.")
-                else if (selectedTab == 0) {
-                    Surface(color = Panel, shape = MaterialTheme.shapes.extraLarge, modifier = Modifier.fillMaxWidth()) {
-                        Column(Modifier.padding(20.dp)) {
-                            Text("YOUR NEXT FAVORITE", color = Accent, fontSize = 11.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
-                            Spacer(Modifier.height(8.dp))
-                            Text("Explore the anime universe", color = Color.White, fontSize = 22.sp, fontWeight = FontWeight.Bold)
-                            Spacer(Modifier.height(6.dp))
-                            Text("A clean home for your anime discovery and personal library.", color = Color.LightGray)
-                        }
+            Column(Modifier.fillMaxSize().padding(padding)) {
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Column(Modifier.weight(1f)) {
+                        Text("ANIMEX", color = Violet, fontSize = 12.sp, fontWeight = FontWeight.Black, letterSpacing = 4.sp)
+                        Text(when (selectedTab) { 1 -> "Find your next anime"; 2 -> "Your collection"; else -> "Anime, your way." }, color = Color.White, fontSize = 27.sp, fontWeight = FontWeight.Bold)
                     }
-                    Spacer(Modifier.height(22.dp))
-                    Text("Popular categories", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
+                    IconButton(onClick = { localVideoPicker.launch(arrayOf("video/*")) }) {
+                        Icon(Icons.Default.PlayArrow, contentDescription = "Play local video", tint = Violet)
+                    }
+                }
+                if (selectedTab == 1) {
+                    OutlinedTextField(
+                        value = query,
+                        onValueChange = { query = it },
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                        placeholder = { Text("Search titles") },
+                        singleLine = true,
+                        shape = RoundedCornerShape(16.dp),
+                        keyboardOptions = KeyboardOptions(imeAction = ImeAction.Search),
+                        keyboardActions = KeyboardActions(onSearch = { vm.search(query) }),
+                        trailingIcon = { IconButton(onClick = { vm.search(query) }) { Icon(Icons.Default.Search, null) } }
+                    )
                     Spacer(Modifier.height(12.dp))
-                    val categories = listOf("Action", "Adventure", "Comedy", "Drama", "Fantasy", "Sci-Fi")
-                    LazyVerticalGrid(columns = GridCells.Fixed(2), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                        items(categories) { category ->
-                            Surface(color = Panel, shape = MaterialTheme.shapes.large) {
-                                Text(category, color = Color.White, modifier = Modifier.padding(18.dp), fontWeight = FontWeight.SemiBold)
+                }
+                if (selectedTab == 0) {
+                    Surface(
+                        modifier = Modifier.fillMaxWidth().padding(horizontal = 18.dp),
+                        shape = RoundedCornerShape(26.dp),
+                        color = SurfaceDark
+                    ) {
+                        Box(Modifier.background(Brush.linearGradient(listOf(Color(0xFF30265B), SurfaceDark))).padding(22.dp)) {
+                            Column {
+                                Text("DISCOVER SOMETHING NEW", color = Violet, fontSize = 10.sp, fontWeight = FontWeight.Bold, letterSpacing = 2.sp)
+                                Spacer(Modifier.height(9.dp))
+                                Text("Your anime universe.", color = Color.White, fontSize = 25.sp, fontWeight = FontWeight.ExtraBold)
+                                Spacer(Modifier.height(6.dp))
+                                Text("Explore titles, save favorites and play your own videos.", color = Muted, fontSize = 13.sp)
+                                Spacer(Modifier.height(14.dp))
+                                Button(onClick = { selectedTab = 1 }, colors = ButtonDefaults.buttonColors(containerColor = Violet, contentColor = Background)) { Text("Explore catalog") }
                             }
                         }
                     }
-                } else EmptyState("Catalog not connected", "Connect an authorized metadata provider to load real titles. AnimeX will not show invented posters or placeholder movies.")
+                }
+                Row(Modifier.fillMaxWidth().padding(horizontal = 20.dp, vertical = 16.dp), verticalAlignment = Alignment.CenterVertically) {
+                    Text(if (selectedTab == 2) "Saved titles" else if (selectedTab == 1) "Search results" else "Popular titles", color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold, modifier = Modifier.weight(1f))
+                    if (selectedTab == 0) TextButton(onClick = { vm.loadCatalog() }) { Text("Refresh", color = Violet) }
+                }
+                when {
+                    selectedTab == 2 && favorites.isEmpty() -> EmptyState("Nothing saved yet", "Tap the heart on any title to keep it here.")
+                    loading -> Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = Violet) }
+                    error != null -> EmptyState("Catalog unavailable", error ?: "Try again.")
+                    selectedTab == 2 -> TitleGrid(favorites.map { it.toTitle() }, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = vm::toggleFavorite)
+                    titles.isEmpty() -> EmptyState("No titles to show", "Connect the backend and configure its TMDB metadata token. AnimeX never inserts fake posters or placeholder titles.")
+                    else -> TitleGrid(titles, favorites.map { it.id }.toSet(), onOpen = { selectedTitle = it }, onFavorite = vm::toggleFavorite)
+                }
+            }
+        }
+        selectedTitle?.let { title ->
+            AlertDialog(
+                onDismissRequest = { selectedTitle = null },
+                containerColor = SurfaceDark,
+                title = { Text(title.title, color = Color.White, fontWeight = FontWeight.Bold) },
+                text = { Column {
+                    title.poster_url?.let { AsyncImage(model = it, contentDescription = title.title, modifier = Modifier.fillMaxWidth().height(180.dp)) }
+                    Spacer(Modifier.height(10.dp))
+                    Text(title.overview.ifBlank { "No synopsis is available from the metadata provider." }, color = Muted)
+                    title.release_date?.let { Text("Release: $it", color = Violet, modifier = Modifier.padding(top = 8.dp)) }
+                } },
+                confirmButton = { TextButton(onClick = { vm.toggleFavorite(title) }) { Text("Save / remove", color = Violet) } },
+                dismissButton = { TextButton(onClick = { selectedTitle = null }) { Text("Close", color = Muted) } }
+            )
+        }
+    }
+}
+
+@Composable
+private fun TitleGrid(items: List<AnimeTitle>, favoriteIds: Set<String>, onOpen: (AnimeTitle) -> Unit, onFavorite: (AnimeTitle) -> Unit) {
+    LazyVerticalGrid(
+        columns = GridCells.Adaptive(minSize = 145.dp),
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(start = 16.dp, end = 16.dp, bottom = 20.dp),
+        horizontalArrangement = Arrangement.spacedBy(12.dp),
+        verticalArrangement = Arrangement.spacedBy(14.dp)
+    ) {
+        items(items, key = { it.id }) { title ->
+            Column {
+                Box {
+                    Surface(shape = RoundedCornerShape(18.dp), color = SurfaceDark, modifier = Modifier.fillMaxWidth().height(205.dp).clickable { onOpen(title) }) {
+                        if (title.poster_url != null) AsyncImage(model = title.poster_url, contentDescription = title.title, modifier = Modifier.fillMaxSize())
+                        else Box(contentAlignment = Alignment.Center) { Text("POSTER
+UNAVAILABLE", color = Muted, fontSize = 11.sp) }
+                    }
+                    IconButton(onClick = { onFavorite(title) }, modifier = Modifier.align(Alignment.TopEnd)) {
+                        Icon(if (title.id in favoriteIds) Icons.Default.Favorite else Icons.Default.FavoriteBorder, contentDescription = "Favorite", tint = if (title.id in favoriteIds) Color(0xFFFF6B91) else Color.White)
+                    }
+                }
+                Spacer(Modifier.height(7.dp))
+                Text(title.title, color = Color.White, fontWeight = FontWeight.SemiBold, fontSize = 13.sp, maxLines = 2)
+                Text(title.release_date?.take(4) ?: "Anime", color = Muted, fontSize = 11.sp)
             }
         }
     }
@@ -87,9 +184,13 @@ private fun AnimeXApp() {
 
 @Composable
 private fun EmptyState(title: String, message: String) {
-    Column(Modifier.fillMaxWidth().padding(top = 54.dp), horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
-        Spacer(Modifier.height(8.dp))
-        Text(message, color = Color.LightGray)
+    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+        Column(horizontalAlignment = Alignment.CenterHorizontally, modifier = Modifier.padding(28.dp)) {
+            Text(title, color = Color.White, fontSize = 20.sp, fontWeight = FontWeight.Bold)
+            Spacer(Modifier.height(8.dp))
+            Text(message, color = Muted)
+        }
     }
 }
+
+private fun FavoriteEntity.toTitle() = AnimeTitle(id = id, title = title, poster_url = posterUrl, overview = overview)
