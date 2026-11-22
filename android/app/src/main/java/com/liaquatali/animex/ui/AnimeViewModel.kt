@@ -25,8 +25,9 @@ class AnimeViewModel(application: Application) : AndroidViewModel(application) {
     private val favoritesDao = AnimeDatabase.get(application).favoriteDao()
     private val api = NetworkModule.api
     private val historyDao = AnimeDatabase.get(application).watchHistoryDao()
+    private val cacheDao = AnimeDatabase.get(application).catalogCacheDao()
     val catalog = Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) {
-        AnimePagingSource(api)
+        AnimePagingSource(api, cacheDao)
     }.flow.cachedIn(viewModelScope)
 
     private val _searchResults = MutableStateFlow<PagingData<AnimeTitle>>(PagingData.empty())
@@ -43,7 +44,7 @@ class AnimeViewModel(application: Application) : AndroidViewModel(application) {
         }
         searchJob = viewModelScope.launch {
             Pager(PagingConfig(pageSize = 20, enablePlaceholders = false)) {
-                AnimePagingSource(api, query.trim())
+                AnimePagingSource(api, cacheDao, query.trim())
             }.flow.collect { _searchResults.value = it }
         }
     }
