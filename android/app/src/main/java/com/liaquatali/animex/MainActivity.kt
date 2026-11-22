@@ -14,6 +14,8 @@ import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.grid.items
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -200,7 +202,7 @@ private fun AnimeXApp(vm: AnimeViewModel = viewModel()) {
 
 @Composable
 private fun HistoryList(entries: List<WatchHistoryEntity>, onResume: (WatchHistoryEntity) -> Unit) {
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    Column(Modifier.fillMaxWidth().verticalScroll(rememberScrollState()).padding(horizontal = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         entries.forEach { entry ->
             val progress = if (entry.durationMs > 0) ((entry.positionMs * 100) / entry.durationMs).coerceIn(0, 100) else 0
             Surface(
