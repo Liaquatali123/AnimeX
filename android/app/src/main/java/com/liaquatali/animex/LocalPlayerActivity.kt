@@ -10,6 +10,7 @@ import androidx.activity.ComponentActivity
 import androidx.lifecycle.lifecycleScope
 import androidx.media3.common.C
 import androidx.media3.common.MediaItem
+import androidx.media3.common.MimeTypes
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import androidx.media3.ui.TrackSelectionDialogBuilder
@@ -30,7 +31,10 @@ class LocalPlayerActivity : ComponentActivity() {
         displayName = resolveDisplayName(uri)
         val exoPlayer = ExoPlayer.Builder(this).build()
         player = exoPlayer
-        exoPlayer.setMediaItem(MediaItem.fromUri(uri))
+        val mediaItem = MediaItem.Builder().setUri(uri).apply {
+            if (uri.path?.endsWith(".m3u8", ignoreCase = true) == true) setMimeType(MimeTypes.APPLICATION_M3U8)
+        }.build()
+        exoPlayer.setMediaItem(mediaItem)
         exoPlayer.prepare()
         exoPlayer.playWhenReady = false
 
